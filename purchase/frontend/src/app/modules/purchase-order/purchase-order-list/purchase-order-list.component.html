@@ -1,0 +1,172 @@
+<div class="container mt-4">
+  <!-- Header -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <h2>
+        <i class="bi bi-receipt text-success"></i>
+        Purchase Orders
+      </h2>
+      <p class="text-muted">Manage purchase orders (Auto-generated from Completed Negotiations)</p>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="card mb-4 shadow-sm">
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-3">
+          <label for="filterStatus" class="form-label">
+            <i class="bi bi-funnel me-1"></i>Filter by Status
+          </label>
+          <select class="form-select" id="filterStatus" [(ngModel)]="filterStatus" (ngModelChange)="applyFilters()">
+            <option value="">All Statuses</option>
+            <option value="PENDING">PENDING</option>
+            <option value="COMPLETED">COMPLETED</option>
+            <option value="REJECTED">REJECTED</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label for="filterEventName" class="form-label">
+            <i class="bi bi-funnel me-1"></i>Filter by Training Name
+          </label>
+          <input type="text" class="form-control" id="filterEventName" placeholder="Enter Training Name"
+            [(ngModel)]="filterEventName" (ngModelChange)="applyFilters()">
+        </div>
+
+        <div class="col-md-3">
+          <label for="filterVendorName" class="form-label">
+            <i class="bi bi-funnel me-1"></i>Filter by Vendor Name
+          </label>
+          <input type="text" class="form-control" id="filterVendorName" placeholder="Enter Vendor Name"
+            [(ngModel)]="filterVendorName" (ngModelChange)="applyFilters()">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">
+            <i class="bi bi-sort-down me-1"></i>Sort by Date
+          </label>
+          <button class="btn btn-outline-success w-100" (click)="toggleSortOrder()">
+            <i class="bi" [ngClass]="sortOrder === 'asc' ? 'bi-sort-up' : 'bi-sort-down'"></i>
+            {{ sortOrder === 'asc' ? 'Oldest First' : 'Newest First' }}
+          </button>
+        </div>
+      </div>
+      <div class="row mt-3">
+        <div class="col-12 d-flex justify-content-between align-items-center">
+          <small class="text-muted">
+            Showing {{ filteredOrders.length }} of {{ purchaseOrders.length }} orders
+          </small>
+          <button class="btn btn-secondary" (click)="clearFilters()">
+            <i class="bi bi-x-circle me-2"></i>Clear All Filters
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading Spinner -->
+  <div *ngIf="loading" class="text-center my-5">
+    <div class="spinner-border text-success" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+  </div>
+
+  <!-- No Data Message -->
+  <div *ngIf="!loading && filteredOrders.length === 0" class="alert alert-info">
+    <i class="bi bi-info-circle me-2"></i>
+    {{ purchaseOrders.length === 0 ? 'No purchase orders found.' : 'No purchase orders match the selected filters.' }}
+  </div>
+
+  <!-- Purchase Orders Table -->
+  <div *ngIf="!loading && filteredOrders.length > 0" class="card shadow-sm">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead class="table-success">
+            <tr>
+              <th class="text-center text-nowrap">PO ID</th>
+              <th class="text-center text-nowrap">PR Number</th>
+              <th class="text-nowrap">Training Name</th>
+              <th class="text-nowrap">Vendor Name</th>
+              <th class="text-center text-nowrap">Order Date</th>
+              <th class="text-end text-nowrap">Amount (INR)</th>
+              <th class="text-end text-nowrap">Amount ($)</th>
+              <th class="text-center text-nowrap">Status</th>
+              <th class="text-center text-nowrap" style="min-width: 250px;">Actions</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            <tr *ngFor="let order of filteredOrders">
+              <td class="text-center">{{ order.po_id }}</td>
+              <td class="text-center">{{ order.prNumber }}</td>
+              <td>{{ order.eventname }}</td>
+              <td>{{ order.vendorname }}</td>
+              <td class="text-center">{{ order.orderdate | date: 'MMM dd, yyyy' }}</td>
+              <td class="text-end">₹{{ order.orderamountINR | number: '1.2-2' }}</td>
+              <td class="text-end">${{ order.orderamountdollar | number: '1.2-2' }}</td>
+              <td class="text-center">
+                <span class="badge" [ngClass]="getStatusClass(order.po_status || 'PENDING')">
+                  {{ order.po_status || 'PENDING' }}
+                </span>
+              </td>
+
+              <td class="text-center">
+                <div class="d-flex flex-column gap-2 align-items-center">
+                  <!-- Action Buttons Row -->
+                  <div class="d-flex gap-1 justify-content-center">
+                    <!-- View Button -->
+                    <button class="btn btn-sm btn-info" (click)="viewPurchaseOrder(order.po_id!)"
+                      [disabled]="!order.po_id" title="View">
+                      <i class="bi bi-eye"></i>
+                    </button>
+
+                    <!-- Edit Button - Hidden if COMPLETED or REJECTED -->
+                    <button class="btn btn-sm btn-primary"
+                      *ngIf="order.po_status !== 'COMPLETED' && order.po_status !== 'REJECTED'"
+                      (click)="editPurchaseOrder(order.po_id!)" [disabled]="!order.po_id" title="Edit">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+
+                    <!-- Delete Button - Only for REJECTED -->
+                    <button class="btn btn-sm btn-danger" *ngIf="order.po_status === 'REJECTED'"
+                      (click)="deletePurchaseOrder(order.po_id!)" [disabled]="!order.po_id" title="Delete">
+                      <i class="bi bi-trash"></i>
+                    </button>
+
+
+                    <!-- View PDF - Only for COMPLETED -->
+                    <button class="btn btn-sm btn-success" *ngIf="order.po_status === 'COMPLETED'"
+                      (click)="viewPDF_LD(order)" [disabled]="!order.po_id" title="View PDF">
+                      <i class="bi bi-file-pdf"></i>
+                    </button>
+                  </div>
+
+                  <!-- Email Section - Only if NOT PENDING -->
+                  <div *ngIf="order.po_status !== 'PENDING'" class="w-100" style="max-width: 200px;">
+                    <!-- Recipient Dropdown -->
+                    <select class="form-select form-select-sm mb-1" [(ngModel)]="selectedRecipient[order.po_id!]"
+                      [name]="'recipient-' + order.po_id">
+                      <option value="">Select Recipient</option>
+                      <option value="ld">L&D</option>
+                      <option value="vendor" *ngIf="order.po_status === 'COMPLETED'">Vendor</option>
+                      <option value="scheduler" *ngIf="order.po_status === 'COMPLETED'">Scheduler</option>
+                      <option value="all" *ngIf="order.po_status === 'COMPLETED'">All Recipients</option>
+                    </select>
+
+                    <!-- Send Mail Button -->
+                    <button class="btn btn-sm btn-warning w-100" (click)="sendMail(order)"
+                      [disabled]="!order.po_id || !selectedRecipient[order.po_id!]" title="Send Email">
+                      <i class="bi bi-envelope me-1"></i>Send Mail
+                    </button>
+                  </div>
+
+                </div>
+              </td>
+
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
